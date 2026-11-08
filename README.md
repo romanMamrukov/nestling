@@ -1,45 +1,54 @@
-# Nestling — GitHub Pages preview
+# Nestling
 
-A free, mobile-first, browser-only baby sleep tracker and scheduling estimator.
+**A calm, simple way to follow your baby's sleep.**
 
-## Publish with GitHub Pages
-1. Go to **Settings → Pages** in this repository.
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-3. Choose **main** and **/(root)**, then **Save**.
-4. Once GitHub reports the site published, open https://romanmamrukov.github.io/nestling/
+Nestling is a free, mobile-friendly web app for recording sleep, understanding daily rhythms, and planning the next nap or bedtime. Its quiet interface keeps sleep tracking easy, even during busy days and late nights.
 
-No GitHub Actions, build step, npm, custom domain, or paid hosting are required. A public repository can use free GitHub Pages, subject to GitHub's current eligibility rules.
+**Website:** https://romanmamrukov.github.io/nestling/
 
-## Included in this Pages build
-- Baby name, birth date, and personalized bedtime onboarding
-- Responsive Today / History / Insights / Settings screens
-- Persistent sleep timer and editable manual sleep logs
-- Session deletion with confirmation, overlap/time validation
-- Basic age/history wake-window estimates, separated nighttime waking and bedtime anchor
-- Daily and rolling 24-hour recorded sleep totals, last seven days graph
-- Browser-local data persistence, JSON export/import and full reset
-- Reminder attempts while the page is active
+## What Nestling does
 
-## Important differences from the earlier Nestling v2.1 package
-This repository currently contains a **standalone Pages preview** in `index.html`, **not the complete earlier multi-file v2.1 project**. It reimplements its core user flows, but the v2.1 modular prediction engine, original automated test suite, and optional Supabase authentication have **not** been imported into this repository. Do not interpret the earlier 13/13 test result as verification of this standalone build.
+- **Sleep timer** — start when your baby falls asleep and stop when they wake up.
+- **Sleep history** — add, edit, and delete records, including naps that cross midnight.
+- **Sleep forecasts** — see an estimated next nap or bedtime based on age and recent recorded patterns.
+- **Daily overview** — see today's logged sleep, the last 24 hours, and recent sessions.
+- **Weekly trends** — view seven days of recorded sleep.
+- **Personal settings** — set your baby's name, birth date, and preferred bedtime.
+- **Reminders** — receive an on-page reminder before an estimated sleep time, while the website stays open.
+- **Three languages** — switch between English, Latvian (Latviešu), and Russian (Русский).
+- **Your data, your choice** — sleep records and language preferences stay in your browser and can be exported to or restored from a JSON backup.
 
-**No real login / accounts / cross-device sync:** GitHub Pages is static hosting, and this preview stores data in browser localStorage. Clearing site data or using another browser/device will not synchronize records. Do not treat this as authenticated storage.
+## Thoughtful by design
 
-**No reliable push:** Notifications are best-effort while the page is open; mobile browsers may suspend background tabs. There is no service worker push subscription, backend, or background scheduler.
+Nestling favors a minimal interface, clear information, and a few meaningful actions over complicated dashboards. It works on phones, tablets, and computers without downloading a native app.
 
-**Not medically validated:** Wake-window starting values are software heuristics, not medical wake-window guidelines. Estimated sleep times predict a family schedule, not clinical sleep needs. Guidance on total sleep duration is population-level and does not determine precise nap timing. The insights screen's error proxy is **not** a validated prospective forecasting accuracy metric.
+The website is hosted with GitHub Pages. It runs directly in the browser with no registration or subscription.
 
-## Preview acceptance test
-On a phone or desktop:
-1. Create a baby profile.
-2. Start a sleep timer and stop it after a minute.
-3. Create a past entry, edit it, then delete it.
-4. Check that totals update and no sessions overlap.
-5. Open Insights and Settings; edit bedtime and reminder.
-6. Export a backup, delete all records, and restore the backup.
-7. Refresh the page; confirm records persist.
+## Privacy
 
-The code was uploaded via the GitHub connector. Full browser/device end-to-end testing has **not** been verified.
+Nestling keeps your sleep records and preferences in the browser's local storage. They are not uploaded to a Nestling server. Data does not automatically sync between devices or browser profiles. You can export a copy or delete your locally stored records at any time.
 
-## Safety and privacy
-This is a private-device prototype. Avoid entering identifiable child health information on shared devices. Public use requires a privacy notice and GDPR compliance review, and production cloud accounts require a properly configured backend with access controls. This app does not replace infant safe sleep recommendations, supervision, or medical advice.
+Please use a trusted device and retain a backup if your sleep history matters to you. Clearing browser data or using private browsing may remove local records.
+
+## Understanding sleep forecasts
+
+Forecasts are estimates based on recorded patterns and age-related scheduling assumptions, not medical assessments. They are not clinically validated and may be less useful when records are incomplete. Parents should follow their baby's cues and seek advice from a qualified healthcare professional when needed.
+
+Nestling is not a baby monitor, a medical device, or a substitute for safe sleep practices.
+
+## Project
+
+Nestling is an independent web project exploring a simpler and more accessible experience for baby sleep tracking and scheduling.
+
+Built with HTML, CSS, and JavaScript. Hosted on GitHub Pages.
+
+## Repository
+
+This repository contains the public Nestling website:
+
+- `index.html` — application interface, sleep tracking, and forecasting
+- `i18n.js` — English, Latvian, and Russian language translations
+- `.nojekyll` — GitHub Pages configuration
+- `README.md` — project information
+
+© Nestling.
