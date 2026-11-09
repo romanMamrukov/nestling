@@ -43,5 +43,16 @@ The dependency-free tests cover validation of sleep records and preferences, bac
 6. Confirm reminders can appear while the app is foregrounded, but **never promise delivery when it is closed or suspended**.
 7. Verify browser storage clearing does remove local data; restore from an exported backup.
 
+
+## Age-informed sleep forecasts
+1. Verify the `Unimums` reference ranges in Insights for 4, 5, 6–7, 8–9, 10–11, 12–17, 18–23, 24–35, 36–47, and 48–83 completed months.
+2. Verify at least three boundary transitions: 5→6, 9→10 and 11→12 months.
+3. On a six-month profile, a completed sleep ending at 08:15 yields a baseline next-nap target near 11:00, before adding personal sleep history.
+4. Add 10+ realistic consecutive records and verify the forecast adapts without leaving the age-based wake-window range.
+5. Verify a night waking does not trigger an immediate daytime nap forecast.
+6. Confirm the PDF-derived range is explicitly labeled as a *reference*, while AASM sleep-duration guidance is displayed separately.
+7. Test incomplete logs, clock changes, nap transitions, and a newborn profile. Do not interpret these ranges as medical standards.
+8. Confirm schedule data, forecasts, and all three languages remain available in airplane mode.
+
 ## Release gate
 Do not merge to `main` until these device checks pass and known issues are documented. A green source syntax check is not a substitute for a real browser test.
