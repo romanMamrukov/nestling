@@ -5,7 +5,17 @@ const MIN=60000,DAY=86400000;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const t=k=>NestlingLocale.t(k,state?.prefs?.language||"en");const now=()=>Date.now(),fmt=t=>new Date(t).toLocaleTimeString(state?.prefs?.language||"en",{hour:"2-digit",minute:"2-digit"}),fdate=t=>new Date(t).toLocaleDateString(state?.prefs?.language||"en",{weekday:"short",month:"short",day:"numeric"}),dur=m=>Math.floor(m/60)+"h "+Math.round(m%60)+"m";
 const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en"},sessions:[],active:null},lastAlert="";
+let state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en",backupReminder:"daily"},sessions:[],active:null},lastAlert="";
+const BACKUP_META="nestling-backup-notice-v1",NOTICE_META="nestling-reminder-notice-v1";
+let backupMeta={lastPrompt:"",lastExport:"",snoozeUntil:0},noticeMeta={key:"",dismissed:false};
+try{backupMeta={...backupMeta,...JSON.parse(localStorage.getItem(BACKUP_META)||"{}")};noticeMeta={...noticeMeta,...JSON.parse(sessionStorage.getItem(NOTICE_META)||"{}")}}catch{}
+function storeBackupMeta(){try{localStorage.setItem(BACKUP_META,JSON.stringify(backupMeta))}catch{}}
+function storeNoticeMeta(){try{sessionStorage.setItem(NOTICE_META,JSON.stringify(noticeMeta))}catch{}}
+function todayKey(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
+function showBackupReminder(){if(!state.baby||state.prefs.backupReminder==="off")return $("#backupBanner").hidden=true;const h=new Date().getHours(),today=todayKey();const due=h>=20&&backupMeta.lastPrompt!==today&&backupMeta.snoozeUntil<=now()&&state.sessions.length>0;$("#backupBanner").hidden=!due;if(due){backupMeta.lastPrompt=today;storeBackupMeta()}}
+function notificationState(){if(!("Notification" in window)||!("serviceWorker" in navigator))return "unsupported";return Notification.permission}
+function updateNotificationStatus(){const status=notificationState();$("#notificationStatus").textContent=t(status==="granted"?"notificationEnabled":status==="denied"?"notificationDenied":status==="default"?"notificationNotEnabled":"notificationUnsupported")}
+function showRemindBanner(p,key){if(noticeMeta.key!==key){noticeMeta={key,dismissed:false};storeNoticeMeta()}if(noticeMeta.dismissed)return;$("#reminderBanner").hidden=false;$("#reminderBannerMessage").textContent=t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)}
 let writes=Promise.resolve(),writeBlocked=false,channel;
 function save(){if(writeBlocked){toast("Storage unavailable. Export your data before closing this page.");return Promise.resolve(false)}
 const snapshot=structuredClone(state);
@@ -22,7 +32,7 @@ function isNight(s){const time=new Date(s.start),min=time.getHours()*60+time.get
 function forecast(){return NestlingSchedule.compute({dob:state.baby?.dob,sessions:state.sessions,active:state.active,bedtime:state.prefs.bedtime,now:now()})}
 function render(){applyLanguage();if(!state.baby){$("#welcome").classList.remove("hide");$("#main").classList.add("hide");$("#setup [name=dob]").max=new Date().toISOString().slice(0,10);return}$("#welcome").classList.add("hide");$("#main").classList.remove("hide");$("#greeting").textContent=state.baby.name;$("#age").textContent=age()+" "+t("ageMonths");const p=forecast(),rows=p.rows||cleanSessions(),ts=now(),start=new Date();start.setHours(0,0,0,0);
 $("#todayTotal").textContent=dur(sleepBetween(+start,ts)+(state.active?Math.max(0,(ts-Math.max(state.active.start,+start))/MIN):0));$("#todayCount").textContent=rows.filter(s=>s.end>+start).length;$("#lastWake").textContent=rows.length?fmt(rows.at(-1).end):"—";$("#rollingTotal").textContent=dur(sleepBetween(ts-DAY,ts));let g=guidance(age());$("#guidance").textContent=t("recorded")+": "+dur(sleepBetween(ts-DAY,ts))+". "+t("population")+": "+g[0]+"–"+g[1]+" "+t("hours")+"/24h. "+t(age()<4?"guideNewborn":age()<12?"guideAasmInfant":age()<36?"guideAasmToddler":"guideAasmChild")+". "+t("missing");
-$("#forecast").textContent=state.active?t("sleeping")+" · "+dur((ts-state.active.start)/MIN):p.ready?fmt(p.target):t(p.reasonKey||"addPrompt");$("#range").textContent=p.ready?t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.earliest)+" – "+fmt(p.latest):t("needsRecord");$("#forecastNote").textContent=p.ready?p.history+" "+t("usedIntervals")+". "+t(p.calibrated?"pastNotValidated":"notCalibrated")+(p.referenceOnly?" "+t("newbornCaution"):""):t("noSubstitute");$("#toggleSleep").textContent=t(state.active?"stopSleep":"startSleep");$("#discardTimer").hidden=!state.active;
+$("#forecast").textContent=state.active?t("sleeping")+" · "+dur((ts-state.active.start)/MIN):p.ready?fmt(p.target):t(p.reasonKey||"addPrompt");$("#range").textContent=p.ready?t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.earliest)+" – "+fmt(p.latest):t("needsRecord");$("#forecastNote").textContent=p.ready?p.history+" "+t("usedIntervals")+". "+t(p.calibrated?"pastNotValidated":"notCalibrated")+(p.referenceOnly?" "+t("newbornCaution"):""):t("noSubstitute");$("#toggleSleep").textContent=t(state.active?"stopSleep":"startSleep");$("#discardTimer").hidden=!state.active;$("#adjustStart").textContent=t(state.active?"adjustStart":"setStart");
 const entry=s=>'<div class="entry"><div><strong>'+fdate(s.start)+' · '+fmt(s.start)+'–'+fmt(s.end)+'</strong><small>'+dur((s.end-s.start)/MIN)+' · '+t(isNight(s)?"nightEstimated":"napEstimated")+'</small></div><div class="actions" style="margin:0"><button data-edit="'+escapeHTML(s.id)+'">'+t("edit")+'</button><button data-delete="'+escapeHTML(s.id)+'" style="color:#a03d35">'+t("delete")+'</button></div></div>';
 $("#recent").innerHTML=rows.slice(-4).reverse().map(entry).join("")||'<p class="muted">'+t("noRecent")+'</p>';$("#historyEntries").innerHTML=rows.slice().reverse().map(entry).join("")||'<p class="muted">'+t("noRecords")+'</p>';
 let bars=[];for(let i=6;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);let end=new Date(d);end.setDate(end.getDate()+1);bars.push({label:d.toLocaleDateString(undefined,{weekday:"short"}),hours:sleepBetween(+d,Math.min(+end,ts))/60})}$("#bars").innerHTML=bars.map(v=>'<div class="barcol"><span>'+v.hours.toFixed(1)+'h</span><div class="bar" style="height:'+Math.min(100,v.hours/17*100)+'%"></div><span>'+v.label+'</span></div>').join("");
@@ -41,13 +51,16 @@ $("#predictionDetails").innerHTML='<div class="stat">'+t("ageLabel")+': '+age()+
 '</div><h3>'+t("ageReferenceTitle")+'</h3>'+ageInfo+
 '<div class="notice">'+t("referenceDisclaimer")+'</div>'+
 '<div class="notice">'+t("heuristicNotice")+'</div>';
-$("#profile [name=name]").value=state.baby.name;$("#profile [name=dob]").value=state.baby.dob;$("#profile [name=dob]").max=new Date().toISOString().slice(0,10);$("#profile [name=bedtime]").value=state.prefs.bedtime;$("#profile [name=reminder]").value=state.prefs.reminder;$("#profile [name=language]").value=state.prefs.language;
+$("#profile [name=name]").value=state.baby.name;$("#profile [name=dob]").value=state.baby.dob;$("#profile [name=dob]").max=new Date().toISOString().slice(0,10);$("#profile [name=bedtime]").value=state.prefs.bedtime;$("#profile [name=reminder]").value=state.prefs.reminder;$("#profile [name=language]").value=state.prefs.language;$("#profile [name=backupReminder]").value=state.prefs.backupReminder||"daily";updateNotificationStatus();showBackupReminder();
 }
 function validRange(start,end,ignore=null){if(!(start<end)||end>now()+MIN||end-start>18*3600000)return t("invalidRange");if(cleanSessions().some(s=>s.id!==ignore&&start<s.end&&end>s.start))return t("overlap");return""}
 function localValue(t){let d=new Date(t),off=d.getTimezoneOffset()*MIN;return new Date(t-off).toISOString().slice(0,16)}
 function openEntry(id){const s=state.sessions.find(x=>x.id===id);$("#dialogTitle").textContent=t(s?"editSleep":"addSleep");let f=$("#entryForm");f.elements.id.value=s?.id||"";f.elements.start.value=localValue(s?.start??now()-60*MIN);f.elements.end.value=localValue(s?.end??now());$("#entryDialog").showModal()}
 $("#setup").onsubmit=e=>{e.preventDefault();if(writeBlocked)return;const f=e.target;if(+new Date(f.elements.dob.value+"T12:00")>now())return toast(t("birthFuture"));state.baby={name:f.elements.name.value.trim(),dob:f.elements.dob.value};state.prefs.bedtime=f.elements.bedtime.value;save();render()};
-$("#profile").onsubmit=e=>{e.preventDefault();if(writeBlocked)return;let f=e.target;if(+new Date(f.elements.dob.value+"T12:00")>now())return toast(t("birthFuture"));state.baby={name:f.elements.name.value.trim(),dob:f.elements.dob.value};state.prefs={bedtime:f.elements.bedtime.value,reminder:Number(f.elements.reminder.value),language:NestlingLocale.valid(f.elements.language.value)};lastAlert="";save();render();toast(t("settingsSaved"))};
+$("#profile").onsubmit=e=>{e.preventDefault();if(writeBlocked)return;let f=e.target;if(+new Date(f.elements.dob.value+"T12:00")>now())return toast(t("birthFuture"));state.baby={name:f.elements.name.value.trim(),dob:f.elements.dob.value};state.prefs={bedtime:f.elements.bedtime.value,reminder:Number(f.elements.reminder.value),language:NestlingLocale.valid(f.elements.language.value),backupReminder:f.elements.backupReminder.value};lastAlert="";save();render();toast(t("settingsSaved"))};
+$("#adjustStart").onclick=()=>{if(writeBlocked)return;const f=$("#startForm");f.elements.start.value=localValue(state.active?.start??now());$("#startDialog").showModal()};
+$("#cancelStart").onclick=()=>$("#startDialog").close();
+$("#startForm").onsubmit=e=>{e.preventDefault();if(writeBlocked)return;const start=+new Date(e.target.elements.start.value);if(!Number.isFinite(start)||start>now()||start<0||now()-start>18*3600000)return toast(t("invalidStart"));if(cleanSessions().some(s=>start<s.end&&now()>s.start))return toast(t("overlap"));state.active={start};save();$("#startDialog").close();render();toast(t("startSaved"))};
 $("#discardTimer").onclick=()=>{if(writeBlocked||!state.active||!confirm(t("discardConfirm")))return;state.active=null;save();render();toast(t("timerDiscarded"))};
 $("#toggleSleep").onclick=()=>{if(writeBlocked)return;if(!state.active){state.active={start:now()};save();render();return}let start=state.active.start,end=now();if(end-start<MIN)return toast(t("tooShort"));const error=validRange(start,end);if(error)return toast(error);state.sessions.push({id:crypto.randomUUID(),start,end});state.active=null;save();render();toast(t("sleepRecorded"))};
 $("#entryForm").onsubmit=e=>{e.preventDefault();if(writeBlocked)return;const f=e.target,start=+new Date(f.elements.start.value),end=+new Date(f.elements.end.value),id=f.elements.id.value;let error=validRange(start,end,id);if(error)return toast(error);if(id){const row=state.sessions.find(s=>s.id===id);if(!row)return toast(t("entryMissing"));row.start=start;row.end=end}else state.sessions.push({id:crypto.randomUUID(),start,end});save();$("#entryDialog").close();render();toast(t("sleepSaved"))};
@@ -56,13 +69,16 @@ $("#addEntry").onclick=()=>openEntry();$("#historyAdd").onclick=()=>openEntry();
 document.addEventListener("click",e=>{if(writeBlocked)return;const edit=e.target.closest("[data-edit]");if(edit)openEntry(edit.dataset.edit);const del=e.target.closest("[data-delete]");if(del){const id=del.dataset.delete;if(confirm(t("deleteConfirm"))){state.sessions=state.sessions.filter(s=>s.id!==id);save();render();toast(t("sleepDeleted"))}}});
 function setTab(name){$$(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));["dashboard","history","insights","settings"].forEach(t=>$("#"+t).classList.toggle("hide",t!==name))}
 $$(".tabs button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
-$("#export").onclick=()=>{try{NestlingBackup.download(NestlingBackup.envelope(state),"nestling-backup-"+new Date().toISOString().slice(0,10)+".json");toast(t("backupDownloaded"))}catch(err){toast(err.message)}};
+function exportBackup(){NestlingBackup.download(NestlingBackup.envelope(state),"nestling-backup-"+todayKey()+".json");backupMeta.lastExport=todayKey();backupMeta.lastPrompt=todayKey();backupMeta.snoozeUntil=0;storeBackupMeta();$("#backupBanner").hidden=true;toast(t("backupDownloaded"))}
+$("#export").onclick=()=>{try{exportBackup()}catch(err){toast(err.message)}};
+$("#backupNow").onclick=()=>{try{exportBackup()}catch(err){toast(err.message)}};
+$("#backupLater").onclick=()=>{backupMeta.snoozeUntil=now()+4*3600000;backupMeta.lastPrompt="";storeBackupMeta();$("#backupBanner").hidden=true};
 $("#exportEncrypted").onclick=async()=>{try{
 const password=prompt(t("passwordPrompt"));if(password===null)return;
 const verify=prompt(t("repeatPassword"));if(verify===null)return;
 if(password!==verify)throw Error(t("passwordMismatch"));
 const data=await NestlingBackup.encrypt(state,password);NestlingBackup.download(data,"nestling-encrypted-"+new Date().toISOString().slice(0,10)+".json");
-toast(t("encryptedDownloaded"));}catch(err){toast(err.message)}};
+backupMeta.lastExport=todayKey();backupMeta.lastPrompt=todayKey();backupMeta.snoozeUntil=0;storeBackupMeta();$("#backupBanner").hidden=true;toast(t("encryptedDownloaded"));}catch(err){toast(err.message)}};
 $("#persist").onclick=async()=>{try{const ok=await NestlingDB.requestPersistence();toast(t(ok?"persistentGranted":"persistentDenied"))}catch(err){toast(err.message)}};
 $("#import").onclick=()=>$("#importFile").click();
 $("#importFile").onchange=async e=>{
@@ -83,13 +99,39 @@ render();toast(t("imported"));
 }catch(err){toast(err.message)}finally{e.target.value=""}};
 $("#reset").onclick=async()=>{
 if(writeBlocked||!confirm(t("deleteAllConfirm")))return;
-const previous=structuredClone(state);state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en"},sessions:[],active:null};
+const previous=structuredClone(state);state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en",backupReminder:"daily"},sessions:[],active:null};
 const ok=await save();if(!ok){state=previous;return}
 try{localStorage.removeItem(NestlingDB.legacyKey)}catch{}
 render();toast(t("deleted"));
 };
-function notify(){if(!state.baby||state.active||!state.prefs.reminder)return;const p=forecast();if(!p.ready)return;const diff=p.target-now(),offset=Number(state.prefs.reminder)*MIN,key=p.target+"-"+offset;if(document.visibilityState==="visible"&&diff<=offset&&diff>0&&lastAlert!==key){lastAlert=key;toast(t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target));if("Notification" in window&&Notification.permission==="granted")try{new Notification("Nestling",{body:t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)})}catch{}}}
-$("#profile [name=reminder]").addEventListener("change",async()=>{if("Notification" in window&&Notification.permission==="default")await Notification.requestPermission().catch(()=>{})});
+async function sendDeviceNotification(title,body){
+if(notificationState()!=="granted")return false;
+try{const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,tag:"nestling-sleep",renotify:false});return true}catch{return false}
+}
+function notify(){
+if(!state.baby||state.active||!state.prefs.reminder||writeBlocked)return;
+const p=forecast();if(!p.ready){$("#reminderBanner").hidden=true;return}
+const offset=Number(state.prefs.reminder)*MIN,remaining=p.target-now(),key=p.type+"-"+p.target+"-"+offset;
+if(noticeMeta.key!==key){noticeMeta={key,dismissed:false};storeNoticeMeta();$("#reminderBanner").hidden=true}
+if(remaining>offset||remaining<=-10*MIN){if(remaining>offset)$("#reminderBanner").hidden=true;return}
+if(document.visibilityState!=="visible")return;
+showRemindBanner(p,key);
+if(lastAlert===key)return;
+lastAlert=key;
+toast(t("upcomingSleep")+" · "+fmt(p.target));
+void sendDeviceNotification("Nestling",t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target));
+}
+$("#dismissReminder").onclick=()=>{noticeMeta.dismissed=true;storeNoticeMeta();$("#reminderBanner").hidden=true};
+$("#enableNotifications").onclick=async()=>{
+if(notificationState()==="unsupported")return toast(t("notificationUnsupported"));
+if(Notification.permission==="denied")return toast(t("notificationDenied"));
+try{await navigator.serviceWorker.ready;const result=await Notification.requestPermission();updateNotificationStatus();toast(t(result==="granted"?"notificationEnabled":result==="denied"?"notificationDenied":"notificationNotEnabled"))}catch(err){toast(t("notificationUnsupported"))}
+};
+$("#testNotification").onclick=async()=>{
+updateNotificationStatus();if(notificationState()!=="granted")return toast(t("enableFirst"));
+const ok=await sendDeviceNotification("Nestling",t("testNotificationBody"));toast(t(ok?"testSent":"testFailed"))
+};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){render();notify()}});
 window.addEventListener("focus",()=>{if(!writeBlocked){render();notify()}});
 window.addEventListener("pageshow",()=>{if(!writeBlocked){render();notify()}});
 setInterval(()=>{if(state.baby&&!writeBlocked){render();notify()}},15000);
