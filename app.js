@@ -3,7 +3,7 @@
 "use strict";
 const MIN=60000,DAY=86400000;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const t=k=>NestlingLocale.t(k,state?.prefs?.language||"en");const now=()=>Date.now(),fmt=t=>new Date(t).toLocaleTimeString(state?.prefs?.language||"en",{hour:"2-digit",minute:"2-digit"}),fdate=t=>new Date(t).toLocaleDateString(state?.prefs?.language||"en",{weekday:"short",month:"short",day:"numeric"}),dur=m=>Math.floor(m/60)+"h "+Math.round(m%60)+"m";
+const t=k=>NestlingLocale.t(k,state?.prefs?.language||"en");const now=()=>Date.now(),fmt=t=>new Date(t).toLocaleTimeString(state?.prefs?.language||"en",{hour:"2-digit",minute:"2-digit"}),fdate=t=>new Date(t).toLocaleDateString(state?.prefs?.language||"en",{weekday:"short",month:"short",day:"numeric"}),dur=m=>Math.floor(m/60)+" "+t("hours")+" "+Math.round(m%60)+" "+t("minutes");
 const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en",backupReminder:"daily"},sessions:[],active:null},lastAlert="";
 const BACKUP_META="nestling-backup-notice-v1",NOTICE_META="nestling-reminder-notice-v1";
@@ -12,7 +12,7 @@ try{backupMeta={...backupMeta,...JSON.parse(localStorage.getItem(BACKUP_META)||"
 function storeBackupMeta(){try{localStorage.setItem(BACKUP_META,JSON.stringify(backupMeta))}catch{}}
 function storeNoticeMeta(){try{sessionStorage.setItem(NOTICE_META,JSON.stringify(noticeMeta))}catch{}}
 function todayKey(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
-function showBackupReminder(){if(!state.baby||state.prefs.backupReminder==="off")return $("#backupBanner").hidden=true;const h=new Date().getHours(),today=todayKey();const due=h>=20&&backupMeta.lastPrompt!==today&&backupMeta.snoozeUntil<=now()&&state.sessions.length>0;$("#backupBanner").hidden=!due;if(due){backupMeta.lastPrompt=today;storeBackupMeta()}}
+function showBackupReminder(){if(!state.baby||state.prefs.backupReminder==="off"){$("#backupBanner").hidden=true;return}const h=new Date().getHours(),today=todayKey();const due=h>=20&&backupMeta.lastExport!==today&&backupMeta.snoozeUntil<=now()&&state.sessions.length>0;$("#backupBanner").hidden=!due}
 function notificationState(){if(!("Notification" in window)||!("serviceWorker" in navigator))return "unsupported";return Notification.permission}
 function updateNotificationStatus(){const status=notificationState();$("#notificationStatus").textContent=t(status==="granted"?"notificationEnabled":status==="denied"?"notificationDenied":status==="default"?"notificationNotEnabled":"notificationUnsupported")}
 function showRemindBanner(p,key){if(noticeMeta.key!==key){noticeMeta={key,dismissed:false};storeNoticeMeta()}if(noticeMeta.dismissed)return;$("#reminderBanner").hidden=false;$("#reminderBannerMessage").textContent=t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)}
@@ -36,7 +36,7 @@ $("#forecast").textContent=state.active?t("sleeping")+" · "+dur((ts-state.activ
 const entry=s=>'<div class="entry"><div><strong>'+fdate(s.start)+' · '+fmt(s.start)+'–'+fmt(s.end)+'</strong><small>'+dur((s.end-s.start)/MIN)+' · '+t(isNight(s)?"nightEstimated":"napEstimated")+'</small></div><div class="actions" style="margin:0"><button data-edit="'+escapeHTML(s.id)+'">'+t("edit")+'</button><button data-delete="'+escapeHTML(s.id)+'" style="color:#a03d35">'+t("delete")+'</button></div></div>';
 $("#recent").innerHTML=rows.slice(-4).reverse().map(entry).join("")||'<p class="muted">'+t("noRecent")+'</p>';$("#historyEntries").innerHTML=rows.slice().reverse().map(entry).join("")||'<p class="muted">'+t("noRecords")+'</p>';
 let bars=[];for(let i=6;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);let end=new Date(d);end.setDate(end.getDate()+1);bars.push({label:d.toLocaleDateString(undefined,{weekday:"short"}),hours:sleepBetween(+d,Math.min(+end,ts))/60})}$("#bars").innerHTML=bars.map(v=>'<div class="barcol"><span>'+v.hours.toFixed(1)+'h</span><div class="bar" style="height:'+Math.min(100,v.hours/17*100)+'%"></div><span>'+v.label+'</span></div>').join("");
-const prof=p.profile,minutesFmt=n=>n===null||n===undefined?"—":Math.floor(n/60)+"h "+n%60+"m";
+const prof=p.profile,minutesFmt=n=>n===null||n===undefined?"—":Math.floor(n/60)+" "+t("hours")+" "+n%60+" "+t("minutes");
 const ageInfo=prof?'<div class="stat">'+t("referenceWake")+': '+minutesFmt(prof.wake[0])+'–'+minutesFmt(prof.wake[1])+
 '<br>'+t("referenceNaps")+': '+prof.naps[0]+'–'+prof.naps[1]+
 '<br>'+t("napDuration")+': '+minutesFmt(prof.napDuration[0])+'–'+minutesFmt(prof.napDuration[1])+
@@ -84,14 +84,12 @@ $("#import").onclick=()=>$("#importFile").click();
 $("#importFile").onchange=async e=>{
 const file=e.target.files[0];if(!file)return;
 try{
-if(writeBlocked)throw Error("Storage unavailable");
-if(file.size>5000000)throw Error("Backup exceeds 5 MB");
+if(writeBlocked)throw Error(t("storageUnavailable"));
+if(file.size>5000000)throw Error(t("backupTooLarge"));
 const obj=JSON.parse(await file.text());
 const data=obj.format==="nestling-encrypted-backup"?
-await NestlingBackup.decrypt(obj,prompt("Password for encrypted backup")||""):NestlingBackup.read(obj);
-const preview="Baby: "+(data.baby?.name||"none")+"\nSleep sessions: "+data.sessions.length+
-"\nLanguage: "+data.prefs.language+"\nTimer: "+(data.active?"Running":"Off")+
-"\n\nReplace all existing records with this backup?";
+await NestlingBackup.decrypt(obj,prompt(t("decryptPassword"))||""):NestlingBackup.read(obj);
+const preview=t("importBaby")+": "+(data.baby?.name||"—")+"\n"+t("importSessions")+": "+data.sessions.length+"\n"+t("language")+": "+data.prefs.language+"\n"+t("importTimer")+": "+t(data.active?"importRunning":"importStopped")+"\n\n"+t("replaceConfirm");
 if(!confirm(preview))return;
 const previous=structuredClone(state);state=data;
 const ok=await save();if(!ok){state=previous;render();return}
@@ -125,7 +123,7 @@ $("#dismissReminder").onclick=()=>{noticeMeta.dismissed=true;storeNoticeMeta();$
 $("#enableNotifications").onclick=async()=>{
 if(notificationState()==="unsupported")return toast(t("notificationUnsupported"));
 if(Notification.permission==="denied")return toast(t("notificationDenied"));
-try{await navigator.serviceWorker.ready;const result=await Notification.requestPermission();updateNotificationStatus();toast(t(result==="granted"?"notificationEnabled":result==="denied"?"notificationDenied":"notificationNotEnabled"))}catch(err){toast(t("notificationUnsupported"))}
+try{const result=await Notification.requestPermission();updateNotificationStatus();toast(t(result==="granted"?"notificationEnabled":result==="denied"?"notificationDenied":"notificationNotEnabled"))}catch(err){toast(t("notificationUnsupported"))}
 };
 $("#testNotification").onclick=async()=>{
 updateNotificationStatus();if(notificationState()!=="granted")return toast(t("enableFirst"));
