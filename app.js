@@ -35,7 +35,7 @@ $("#todayTotal").textContent=dur(sleepBetween(+start,ts)+(state.active?Math.max(
 $("#forecast").textContent=state.active?t("sleeping")+" · "+dur((ts-state.active.start)/MIN):p.ready?fmt(p.target):t(p.reasonKey||"addPrompt");$("#range").textContent=p.ready?t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.earliest)+" – "+fmt(p.latest):t("needsRecord");$("#forecastNote").textContent=p.ready?p.history+" "+t("usedIntervals")+". "+t(p.calibrated?"pastNotValidated":"notCalibrated")+(p.referenceOnly?" "+t("newbornCaution"):""):t("noSubstitute");$("#toggleSleep").textContent=t(state.active?"stopSleep":"startSleep");$("#discardTimer").hidden=!state.active;$("#adjustStart").textContent=t(state.active?"adjustStart":"setStart");
 const entry=s=>'<div class="entry"><div><strong>'+fdate(s.start)+' · '+fmt(s.start)+'–'+fmt(s.end)+'</strong><small>'+dur((s.end-s.start)/MIN)+' · '+t(isNight(s)?"nightEstimated":"napEstimated")+'</small></div><div class="actions" style="margin:0"><button data-edit="'+escapeHTML(s.id)+'">'+t("edit")+'</button><button data-delete="'+escapeHTML(s.id)+'" style="color:#a03d35">'+t("delete")+'</button></div></div>';
 $("#recent").innerHTML=rows.slice(-4).reverse().map(entry).join("")||'<p class="muted">'+t("noRecent")+'</p>';$("#historyEntries").innerHTML=rows.slice().reverse().map(entry).join("")||'<p class="muted">'+t("noRecords")+'</p>';
-let bars=[];for(let i=6;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);let end=new Date(d);end.setDate(end.getDate()+1);bars.push({label:d.toLocaleDateString(undefined,{weekday:"short"}),hours:sleepBetween(+d,Math.min(+end,ts))/60})}$("#bars").innerHTML=bars.map(v=>'<div class="barcol"><span>'+v.hours.toFixed(1)+'h</span><div class="bar" style="height:'+Math.min(100,v.hours/17*100)+'%"></div><span>'+v.label+'</span></div>').join("");
+let bars=[];for(let i=6;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);let end=new Date(d);end.setDate(end.getDate()+1);bars.push({label:d.toLocaleDateString(state.prefs.language||"en",{weekday:"short"}),hours:sleepBetween(+d,Math.min(+end,ts))/60})}$("#bars").innerHTML=bars.map(v=>'<div class="barcol"><span>'+v.hours.toFixed(1)+'h</span><div class="bar" style="height:'+Math.min(100,v.hours/17*100)+'%"></div><span>'+v.label+'</span></div>').join("");
 const prof=p.profile,minutesFmt=n=>n===null||n===undefined?"—":Math.floor(n/60)+" "+t("hours")+" "+n%60+" "+t("minutes");
 const ageInfo=prof?'<div class="stat">'+t("referenceWake")+': '+minutesFmt(prof.wake[0])+'–'+minutesFmt(prof.wake[1])+
 '<br>'+t("referenceNaps")+': '+prof.naps[0]+'–'+prof.naps[1]+
@@ -77,6 +77,7 @@ $("#exportEncrypted").onclick=async()=>{try{
 const password=prompt(t("passwordPrompt"));if(password===null)return;
 const verify=prompt(t("repeatPassword"));if(verify===null)return;
 if(password!==verify)throw Error(t("passwordMismatch"));
+if(password.length<12)throw Error(t("passwordMinLength"));
 const data=await NestlingBackup.encrypt(state,password);NestlingBackup.download(data,"nestling-encrypted-"+new Date().toISOString().slice(0,10)+".json");
 backupMeta.lastExport=todayKey();backupMeta.lastPrompt=todayKey();backupMeta.snoozeUntil=0;storeBackupMeta();$("#backupBanner").hidden=true;toast(t("encryptedDownloaded"));}catch(err){toast(err.message)}};
 $("#persist").onclick=async()=>{try{const ok=await NestlingDB.requestPersistence();toast(t(ok?"persistentGranted":"persistentDenied"))}catch(err){toast(err.message)}};
@@ -94,7 +95,7 @@ if(!confirm(preview))return;
 const previous=structuredClone(state);state=data;
 const ok=await save();if(!ok){state=previous;render();return}
 render();toast(t("imported"));
-}catch(err){toast(err.message)}finally{e.target.value=""}};
+}catch(err){console.warn("Backup import failed",err);toast(err.message===t("backupTooLarge")?err.message:String(err.message).includes("decrypt")?t("decryptFailed"):t("importFailed"))}finally{e.target.value=""}};
 $("#reset").onclick=async()=>{
 if(writeBlocked||!confirm(t("deleteAllConfirm")))return;
 const previous=structuredClone(state);state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en",backupReminder:"daily"},sessions:[],active:null};
