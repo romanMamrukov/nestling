@@ -9,7 +9,7 @@ let state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en"},sessions:
 let writes=Promise.resolve(),writeBlocked=false,channel;
 function save(){if(writeBlocked){toast("Storage unavailable. Export your data before closing this page.");return Promise.resolve(false)}
 const snapshot=structuredClone(state);
-writes=writes.then(async()=>{await NestlingDB.replace(snapshot);channel?.postMessage({changed:true});return true}).catch(err=>{writeBlocked=true;const warning=document.querySelector("#storageError");warning.hidden=false;warning.textContent="Cannot save changes: "+err.message+". Stop editing and export a backup. Reload only after securing your records.";toast("Save failed: "+err.message);return false});
+writes=writes.then(async()=>{await NestlingDB.replace(snapshot);channel?.postMessage({changed:true});return true}).catch(err=>{writeBlocked=true;const warning=document.querySelector("#storageError");warning.hidden=false;warning.textContent=t("storageFailure")+": "+err.message+". Export a backup before leaving this page.";toast(t("storageFailure")+": "+err.message);return false});
 return writes;}
 function applyLanguage(){state.prefs.language=NestlingLocale.valid(state.prefs.language);NestlingLocale.apply(state.prefs.language)}
 $("#headerLanguage").addEventListener("change",e=>{if(writeBlocked)return;state.prefs.language=NestlingLocale.valid(e.target.value);save();render()});
@@ -44,14 +44,14 @@ $("#addEntry").onclick=()=>openEntry();$("#historyAdd").onclick=()=>openEntry();
 document.addEventListener("click",e=>{if(writeBlocked)return;const edit=e.target.closest("[data-edit]");if(edit)openEntry(edit.dataset.edit);const del=e.target.closest("[data-delete]");if(del){const id=del.dataset.delete;if(confirm(t("deleteConfirm"))){state.sessions=state.sessions.filter(s=>s.id!==id);save();render();toast(t("sleepDeleted"))}}});
 function setTab(name){$$(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));["dashboard","history","insights","settings"].forEach(t=>$("#"+t).classList.toggle("hide",t!==name))}
 $$(".tabs button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
-$("#export").onclick=()=>{try{NestlingBackup.download(NestlingBackup.envelope(state),"nestling-backup-"+new Date().toISOString().slice(0,10)+".json");toast("Backup downloaded")}catch(err){toast(err.message)}};
+$("#export").onclick=()=>{try{NestlingBackup.download(NestlingBackup.envelope(state),"nestling-backup-"+new Date().toISOString().slice(0,10)+".json");toast(t("backupDownloaded"))}catch(err){toast(err.message)}};
 $("#exportEncrypted").onclick=async()=>{try{
-const password=prompt("Create a backup password (12+ characters). It cannot be recovered.");if(password===null)return;
-const verify=prompt("Repeat the backup password");if(verify===null)return;
-if(password!==verify)throw Error("Passwords do not match");
+const password=prompt(t("passwordPrompt"));if(password===null)return;
+const verify=prompt(t("repeatPassword"));if(verify===null)return;
+if(password!==verify)throw Error(t("passwordMismatch"));
 const data=await NestlingBackup.encrypt(state,password);NestlingBackup.download(data,"nestling-encrypted-"+new Date().toISOString().slice(0,10)+".json");
-toast("Encrypted backup downloaded");}catch(err){toast(err.message)}};
-$("#persist").onclick=async()=>{try{const ok=await NestlingDB.requestPersistence();toast(ok?"Persistent storage granted":"Browser did not grant persistent storage")}catch(err){toast(err.message)}};
+toast(t("encryptedDownloaded"));}catch(err){toast(err.message)}};
+$("#persist").onclick=async()=>{try{const ok=await NestlingDB.requestPersistence();toast(t(ok?"persistentGranted":"persistentDenied"))}catch(err){toast(err.message)}};
 $("#import").onclick=()=>$("#importFile").click();
 $("#importFile").onchange=async e=>{
 const file=e.target.files[0];if(!file)return;
@@ -73,7 +73,8 @@ $("#reset").onclick=async()=>{
 if(writeBlocked||!confirm(t("deleteAllConfirm")))return;
 const previous=structuredClone(state);state={baby:null,prefs:{bedtime:"19:30",reminder:15,language:"en"},sessions:[],active:null};
 const ok=await save();if(!ok){state=previous;return}
-render();toast("Local records deleted");
+try{localStorage.removeItem(NestlingDB.legacyKey)}catch{}
+render();toast(t("deleted"));
 };
 function notify(){if(!state.baby||state.active||!state.prefs.reminder)return;const p=forecast();if(!p.ready)return;const diff=p.target-now(),offset=Number(state.prefs.reminder)*MIN,key=p.target+"-"+offset;if(document.visibilityState==="visible"&&diff<=offset&&diff>0&&lastAlert!==key){lastAlert=key;toast(t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target));if("Notification" in window&&Notification.permission==="granted")new Notification("Nestling",{body:t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)})}}
 $("#profile [name=reminder]").addEventListener("change",async()=>{if("Notification" in window&&Notification.permission==="default")await Notification.requestPermission()});
@@ -86,9 +87,9 @@ const result=await NestlingDB.init();state=result.state;
 channel=typeof BroadcastChannel==="function"?new BroadcastChannel("nestling-updates"):null;
 if(channel)channel.onmessage=()=>{document.querySelector("#tabNotice").hidden=false};
 document.querySelector("#loading").remove();render();
-if(result.migrated)toast("Sleep records migrated safely. Original browser copy preserved.");
+if(result.migrated)toast(t("savedOld"));
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
-}catch(err){document.querySelector("#loading").textContent="Unable to load Nestling data: "+err.message+". Existing local records were not deleted.";document.querySelector("#loading").classList.remove("hide");}
+}catch(err){document.querySelector("#loading").textContent=t("noStorage")+": "+err.message+". Existing records were not deleted.";document.querySelector("#loading").classList.remove("hide");}
 }
 boot();
 })();
