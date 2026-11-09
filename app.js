@@ -13,7 +13,7 @@ function storeBackupMeta(){try{localStorage.setItem(BACKUP_META,JSON.stringify(b
 function storeNoticeMeta(){try{sessionStorage.setItem(NOTICE_META,JSON.stringify(noticeMeta))}catch{}}
 function todayKey(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
 function showBackupReminder(){if(!state.baby||state.prefs.backupReminder==="off"){$("#backupBanner").hidden=true;return}const h=new Date().getHours(),today=todayKey();const due=h>=20&&backupMeta.lastExport!==today&&backupMeta.snoozeUntil<=now()&&state.sessions.length>0;$("#backupBanner").hidden=!due}
-function notificationState(){if(!("Notification" in window)||!("serviceWorker" in navigator))return "unsupported";return Notification.permission}
+function notificationState(){if(!("Notification" in window)||typeof Notification.requestPermission!=="function"||!("serviceWorker" in navigator))return "unsupported";return Notification.permission}
 function updateNotificationStatus(){const status=notificationState();$("#notificationStatus").textContent=t(status==="granted"?"notificationEnabled":status==="denied"?"notificationDenied":status==="default"?"notificationNotEnabled":"notificationUnsupported")}
 function showRemindBanner(p,key){if(noticeMeta.key!==key){noticeMeta={key,dismissed:false};storeNoticeMeta()}if(noticeMeta.dismissed)return;$("#reminderBanner").hidden=false;$("#reminderBannerMessage").textContent=t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)}
 let writes=Promise.resolve(),writeBlocked=false,channel;
@@ -107,7 +107,7 @@ if(notificationState()!=="granted")return false;
 try{const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,tag:"nestling-sleep",renotify:false});return true}catch{return false}
 }
 function notify(){
-if(!state.baby||state.active||!state.prefs.reminder||writeBlocked)return;
+if(!state.baby||state.active||!state.prefs.reminder||writeBlocked){$("#reminderBanner").hidden=true;return}
 const p=forecast();if(!p.ready){$("#reminderBanner").hidden=true;return}
 const offset=Number(state.prefs.reminder)*MIN,remaining=p.target-now(),key=p.type+"-"+p.target+"-"+offset;
 if(noticeMeta.key!==key){noticeMeta={key,dismissed:false};storeNoticeMeta();$("#reminderBanner").hidden=true}
