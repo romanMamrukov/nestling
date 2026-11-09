@@ -1,0 +1,10 @@
+{
+  "name": "nestling-web",
+  "version": "3.0.0-beta.1",
+  "private": true,
+  "type": "module",
+  "description": "Local-first baby sleep companion",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
