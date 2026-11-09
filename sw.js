@@ -1,5 +1,5 @@
 /* Cache app shell only. Family records are never cached in HTTP caches. */
-const CACHE="nestling-shell-v3-1",PREFIX="nestling-shell-",ASSETS=["./","./index.html","./app.js","./storage.js","./backup.js","./i18n.js","./manifest.webmanifest","./icon.svg"];
+const CACHE="nestling-shell-v3-1",PREFIX="nestling-shell-",ASSETS=["./","./index.html","./app.js","./storage.js","./backup.js","./i18n.js","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener("activate",event=>event.waitUntil((async()=>{const all=await caches.keys();await Promise.all(all.filter(k=>k.startsWith(PREFIX)&&k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})()));
 self.addEventListener("fetch",event=>{const req=event.request;if(req.method!=="GET"||new URL(req.url).origin!==self.location.origin)return;
