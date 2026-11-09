@@ -88,8 +88,19 @@ channel=typeof BroadcastChannel==="function"?new BroadcastChannel("nestling-upda
 if(channel)channel.onmessage=()=>{document.querySelector("#tabNotice").hidden=false};
 document.querySelector("#loading").remove();render();
 if(result.migrated)toast(t("savedOld"));
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("./sw.js").then(reg=>{
+const offer=()=>{if(reg.waiting&&navigator.serviceWorker.controller)$("#updateNotice").hidden=false};
+offer();reg.addEventListener("updatefound",()=>{const worker=reg.installing;if(worker)worker.addEventListener("statechange",()=>{if(worker.state==="installed")offer()})});
+}).catch(()=>{});
+navigator.serviceWorker.addEventListener("controllerchange",()=>{if(window.__nestlingUpdating)location.reload()});
+}
 }catch(err){document.querySelector("#loading").textContent=t("noStorage")+": "+err.message+". Existing records were not deleted.";document.querySelector("#loading").classList.remove("hide");}
 }
+let deferredInstall=null;
+window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstall=event});
+$("#installApp").onclick=async()=>{if(deferredInstall){deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;return}
+toast(t("installGuide"));};
+$("#activateUpdate").onclick=()=>{navigator.serviceWorker?.ready.then(reg=>{if(reg.waiting){window.__nestlingUpdating=true;reg.waiting.postMessage({type:"ACTIVATE_UPDATE"})}})};
 boot();
 })();
