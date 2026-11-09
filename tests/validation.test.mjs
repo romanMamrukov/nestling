@@ -90,6 +90,6 @@ test("all visible static UI translation keys exist in all supported languages",(
 });
 test("offline worker includes all required application assets",()=>{
   const sw=read("sw.js");
-  for(const path of ["./index.html","./app.js","./storage.js","./backup.js","./i18n.js","./manifest.webmanifest"])
+  for(const path of ["./index.html","./app.js","./storage.js","./backup.js","./schedule.js","./i18n.js","./manifest.webmanifest"])
     assert.ok(sw.includes(path),path);
 });
