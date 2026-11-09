@@ -77,8 +77,8 @@ const ok=await save();if(!ok){state=previous;return}
 try{localStorage.removeItem(NestlingDB.legacyKey)}catch{}
 render();toast(t("deleted"));
 };
-function notify(){if(!state.baby||state.active||!state.prefs.reminder)return;const p=forecast();if(!p.ready)return;const diff=p.target-now(),offset=Number(state.prefs.reminder)*MIN,key=p.target+"-"+offset;if(document.visibilityState==="visible"&&diff<=offset&&diff>0&&lastAlert!==key){lastAlert=key;toast(t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target));if("Notification" in window&&Notification.permission==="granted")new Notification("Nestling",{body:t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)})}}
-$("#profile [name=reminder]").addEventListener("change",async()=>{if("Notification" in window&&Notification.permission==="default")await Notification.requestPermission()});
+function notify(){if(!state.baby||state.active||!state.prefs.reminder)return;const p=forecast();if(!p.ready)return;const diff=p.target-now(),offset=Number(state.prefs.reminder)*MIN,key=p.target+"-"+offset;if(document.visibilityState==="visible"&&diff<=offset&&diff>0&&lastAlert!==key){lastAlert=key;toast(t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target));if("Notification" in window&&Notification.permission==="granted")try{new Notification("Nestling",{body:t(p.type==="Bedtime"?"bedtime":"nap")+" · "+fmt(p.target)})}catch{}}}
+$("#profile [name=reminder]").addEventListener("change",async()=>{if("Notification" in window&&Notification.permission==="default")await Notification.requestPermission().catch(()=>{})});
 window.addEventListener("focus",()=>{if(!writeBlocked){render();notify()}});
 window.addEventListener("pageshow",()=>{if(!writeBlocked){render();notify()}});
 setInterval(()=>{if(state.baby&&!writeBlocked){render();notify()}},15000);
@@ -103,6 +103,6 @@ let deferredInstall=null;
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstall=event});
 $("#installApp").onclick=async()=>{if(deferredInstall){deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;return}
 toast(t("installGuide"));};
-$("#activateUpdate").onclick=()=>{navigator.serviceWorker?.ready.then(reg=>{if(reg.waiting){window.__nestlingUpdating=true;reg.waiting.postMessage({type:"ACTIVATE_UPDATE"})}})};
+$("#activateUpdate").onclick=async()=>{await writes;navigator.serviceWorker?.ready.then(reg=>{if(reg.waiting){window.__nestlingUpdating=true;reg.waiting.postMessage({type:"ACTIVATE_UPDATE"})}})};
 boot();
 })();
