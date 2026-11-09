@@ -19,7 +19,8 @@ if(s.active!==null&&s.active!==undefined&&(!Number.isFinite(s.active.start)||s.a
 const prefs=s.prefs||{};if(prefs.bedtime!==undefined&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(prefs.bedtime))throw Error("Invalid bedtime");
 if(prefs.language!==undefined&&!["en","lv","ru"].includes(prefs.language))throw Error("Invalid language");
 if(prefs.reminder!==undefined&&![0,5,10,15,30].includes(Number(prefs.reminder)))throw Error("Invalid reminder");
-return clone({baby:s.baby||null,prefs:{bedtime:prefs.bedtime||"19:30",reminder:Number(prefs.reminder??15),language:prefs.language||"en"},sessions:valid,active:s.active||null});}
+if(prefs.backupReminder!==undefined&&!["daily","off"].includes(prefs.backupReminder))throw Error("Invalid backup reminder");
+return clone({baby:s.baby||null,prefs:{bedtime:prefs.bedtime||"19:30",reminder:Number(prefs.reminder??15),language:prefs.language||"en",backupReminder:prefs.backupReminder||"daily"},sessions:valid,active:s.active||null});}
 async function getData(){const tx=db.transaction(["profile","preferences","sessions","meta"],"readonly"),done=txDone(tx);
 const [baby,prefs,active,rows,rev]=await Promise.all([request(tx.objectStore("profile").get("baby")),request(tx.objectStore("preferences").get("prefs")),request(tx.objectStore("meta").get("active")),request(tx.objectStore("sessions").getAll()),request(tx.objectStore("meta").get("revision"))]);await done;
 return{revision:rev?.value||0,state:{baby:baby?.value||null,prefs:prefs?.value||{bedtime:"19:30",reminder:15,language:"en"},active:active?.value||null,sessions:rows.map(r=>r.value)}};}
